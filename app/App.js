@@ -1,7 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import {
   Button,
-  PermissionsAndroid,
   SafeAreaView,
   StatusBar,
   StyleSheet,
@@ -11,19 +10,33 @@ import {
 } from "react-native";
 import { Camera } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
+import { NavigationContainer } from "@react-navigation/native";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { Audio } from "expo-av";
 
-const App = () => {
+const Tab = createBottomTabNavigator();
+
+function HomeScreen() {
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.item}>Home Screen</Text>
+    </SafeAreaView>
+  );
+}
+
+function CameraScreen() {
   const [photo, setPhoto] = useState(null);
-  const [cameraPerms, setCameraPerms] = useState(false);
-  const [libraryPerms, setLibraryPerms] = useState(false);
+  const [video, setVideo] = useState(null);
+
+  const [isRecording, setIsRecording] = useState(false);
 
   useEffect(() => {
     const requestPerms = async () => {
       const cameraPermission = await Camera.requestCameraPermissionsAsync();
       const mediaLibraryPermission =
         await MediaLibrary.requestPermissionsAsync();
-      setCameraPerms(cameraPermission.status === "granted");
-      setLibraryPerms(mediaLibraryPermission.status === "granted");
+      const AudioPerm = await Audio.requestPermissionsAsync();
     };
 
     requestPerms();
@@ -41,9 +54,28 @@ const App = () => {
     setPhoto(newPhoto);
   };
 
+  const handleVideoRecording = async () => {
+    if (cameraRef.current) {
+      if (isRecording) {
+        cameraRef.current.stopRecording();
+        setIsRecording(false);
+      } else {
+        setIsRecording(true);
+        const video = await cameraRef.current.recordAsync();
+        setVideo(video);
+      }
+    }
+  };
+
   const savePhoto = () => {
     MediaLibrary.saveToLibraryAsync(photo.uri).then(() => {
       setPhoto(null);
+    });
+  };
+
+  const saveVideo = () => {
+    MediaLibrary.saveToLibraryAsync(video.uri).then(() => {
+      setVideo(null);
     });
   };
 
@@ -59,16 +91,58 @@ const App = () => {
       </SafeAreaView>
     );
   }
+  if (video) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <Button title="Save" onPress={saveVideo} />
+        <Button title="Discard" onPress={() => setVideo(null)} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <Camera style={styles.container} ref={cameraRef}>
       <View style={styles.buttonContainer}>
-        <Button title="Take Pic" onPress={takePic} />
+        {!isRecording && <Button title="Take Pic" onPress={takePic} />}
+        <Button
+          title={isRecording ? "Stop Recording" : "Start Recording"}
+          onPress={handleVideoRecording}
+        />
       </View>
       <StatusBar style="auto" />
     </Camera>
   );
-};
+}
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName;
+
+            if (route.name === "Home") {
+              iconName = focused ? "ios-home" : "ios-home-outline";
+            } else if (route.name === "Camera") {
+              iconName = focused ? "ios-camera" : "ios-camera-outline";
+            }
+
+            // You can return any component that you like here
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+        })}
+        tabBarOptions={{
+          activeTintColor: "tomato",
+          inactiveTintColor: "gray",
+        }}
+      >
+        <Tab.Screen name="Home" component={HomeScreen} />
+        <Tab.Screen name="Camera" component={CameraScreen} />
+      </Tab.Navigator>
+    </NavigationContainer>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -79,7 +153,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   buttonContainer: {
-    backgroundColor: "fff",
+    backgroundColor: "white",
     alignSelf: "flex-end",
   },
   item: {
@@ -93,5 +167,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-
-export default App;
