@@ -14,6 +14,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { Audio } from "expo-av";
+import * as Location from "expo-location";
 
 const Tab = createBottomTabNavigator();
 
@@ -28,6 +29,7 @@ function HomeScreen() {
 function CameraScreen() {
   const [photo, setPhoto] = useState(null);
   const [video, setVideo] = useState(null);
+  const [location, setLocation] = useState(null);
 
   const [isRecording, setIsRecording] = useState(false);
 
@@ -37,6 +39,12 @@ function CameraScreen() {
       const mediaLibraryPermission =
         await MediaLibrary.requestPermissionsAsync();
       const AudioPerm = await Audio.requestPermissionsAsync();
+      const locationStatus = await Location.requestForegroundPermissionsAsync();
+
+      if (locationStatus.status === "granted") {
+        const currentLocation = await Location.getCurrentPositionAsync({});
+        setLocation(currentLocation);
+      }
     };
 
     requestPerms();
@@ -48,7 +56,14 @@ function CameraScreen() {
     let options = {
       quality: 1,
       base64: true,
-      exif: false,
+      exif: true,
+      fixOrientation: true,
+      forceUpOrientation: true,
+      writeExif: (extraExif = {
+        GPSLatitude: location.coords.latitude,
+        GPSLongitude: location.coords.longitude,
+        GPSAltitude: location.coords.altitude,
+      }),
     };
     let newPhoto = await cameraRef.current.takePictureAsync(options);
     setPhoto(newPhoto);
