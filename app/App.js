@@ -7,6 +7,7 @@ import {
   Text,
   View,
   Image,
+  ActivityIndicator,
 } from "react-native";
 import { Camera } from "expo-camera";
 import * as MediaLibrary from "expo-media-library";
@@ -15,6 +16,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { Audio } from "expo-av";
 import * as Location from "expo-location";
+import DeviceInfo from "react-native-device-info";
 
 const Tab = createBottomTabNavigator();
 
@@ -28,10 +30,16 @@ function HomeScreen() {
 
 function CameraScreen() {
   const [photo, setPhoto] = useState(null);
-  const [video, setVideo] = useState(null);
   const [location, setLocation] = useState(null);
+  const [photoSent, setPhotoSent] = useState(false);
 
-  const [isRecording, setIsRecording] = useState(false);
+  const [retakePhoto, setRetakePhoto] = useState(false);
+  const [pictureBeingTaken, setPictureBeingTaken] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [uniqueId, setUniqueId] = useState(null);
+  const [deviceType, setDeviceType] = useState(null);
+  const [deviceOS, setDeviceOS] = useState(null);
 
   useEffect(() => {
     const requestPerms = async () => {
@@ -45,6 +53,13 @@ function CameraScreen() {
         const currentLocation = await Location.getCurrentPositionAsync({});
         setLocation(currentLocation);
       }
+      const uniqueId = await DeviceInfo.getUniqueId();
+      const type = await DeviceInfo.getType();
+      const os = await DeviceInfo.getOs();
+
+      setUniqueId(uniqueId);
+      setDeviceType(type);
+      setDeviceOS(os);
     };
 
     requestPerms();
@@ -66,31 +81,54 @@ function CameraScreen() {
       }),
     };
     let newPhoto = await cameraRef.current.takePictureAsync(options);
+    setPictureBeingTaken(false);
     setPhoto(newPhoto);
   };
 
-  const handleVideoRecording = async () => {
-    if (cameraRef.current) {
-      if (isRecording) {
-        cameraRef.current.stopRecording();
-        setIsRecording(false);
-      } else {
-        setIsRecording(true);
-        const video = await cameraRef.current.recordAsync();
-        setVideo(video);
-      }
-    }
+  const uploadPhoto = async () => {
+    const formData = new FormData();
+    formData.append(
+      "image",
+      {
+        uri: photo.uri,
+        type: "image/jpeg",
+        name: "image.jpg",
+      },
+      "location",
+      {
+        GPSLatitude: location.coords.latitude,
+        GPSLongitude: location.coords.longitude,
+        GPSAltitude: location.coords.altitude,
+      },
+      "device",
+      { uniqueId, deviceType, deviceOS },
+    );
+    setLoading(true);
+    await fetch("https://api.example.com/upload", {
+      method: "POST",
+      body: formData,
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    })
+      .then((data) => {
+        if (data.response === "Retake Photo") {
+          setRetakePhoto(true);
+        } else {
+          setPhotoSent(true);
+          setPhoto(null);
+        }
+        console.log("Success:", data);
+      })
+      .catch((error) => {
+        console.error("Error:", error);
+      });
+    setLoading(false);
   };
 
   const savePhoto = () => {
     MediaLibrary.saveToLibraryAsync(photo.uri).then(() => {
       setPhoto(null);
-    });
-  };
-
-  const saveVideo = () => {
-    MediaLibrary.saveToLibraryAsync(video.uri).then(() => {
-      setVideo(null);
     });
   };
 
@@ -101,27 +139,52 @@ function CameraScreen() {
           style={styles.preview}
           source={{ uri: "data:image/jpg;base64," + photo.base64 }}
         />
-        <Button title="Save" onPress={savePhoto} />
-        <Button title="Discard" onPress={() => setPhoto(null)} />
-      </SafeAreaView>
-    );
-  }
-  if (video) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Button title="Save" onPress={saveVideo} />
-        <Button title="Discard" onPress={() => setVideo(null)} />
+        {loading ? (
+          <ActivityIndicator />
+        ) : (
+          <View>
+            <Button title="Upload Photo" onPress={uploadPhoto} />
+            <Button title="Save" onPress={savePhoto} />
+            <Button title="Discard" onPress={() => setPhoto(null)} />
+          </View>
+        )}
       </SafeAreaView>
     );
   }
 
-  return (
+  return retakePhoto ? (
+    <View>
+      The photo could not be read. Please retake the photo now. <br></br>
+      <Button
+        title="Retake Photo"
+        onPress={() => {
+          setPhoto(null);
+          setRetakePhoto(false);
+          setPhotoSent(false);
+        }}
+      />
+    </View>
+  ) : photoSent ? (
+    <View>
+      <Text>
+        Photo has been successfully uploaded.<br></br>
+        <Button
+          title="Take Another"
+          onPress={() => {
+            setPhotoSent(false);
+          }}
+        />
+      </Text>
+    </View>
+  ) : (
     <Camera style={styles.container} ref={cameraRef}>
       <View style={styles.buttonContainer}>
-        {!isRecording && <Button title="Take Pic" onPress={takePic} />}
         <Button
-          title={isRecording ? "Stop Recording" : "Start Recording"}
-          onPress={handleVideoRecording}
+          title={pictureBeingTaken ? "capturing photo..." : "Take Picture"}
+          onPress={() => {
+            setPictureBeingTaken(true);
+            takePic();
+          }}
         />
       </View>
       <StatusBar style="auto" />
