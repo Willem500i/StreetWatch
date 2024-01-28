@@ -90,17 +90,18 @@ function CameraScreen() {
 
   const uploadPhoto = async () => {
     setLoading(true);
+    const formData = new FormData();
+    formData.append("image", photo, "photo.jpg");
+    formData.append("location", {
+      GPSLatitude: location.coords.latitude,
+      GPSLongitude: location.coords.longitude,
+    });
+    formData.append("notes", userComments);
+    formData.append("deviceId", Device.deviceName);
+
     await fetch(`${API_ENDPOINT}/api/form`, {
       method: "POST",
-      body: {
-        image: photo.uri,
-        location: {
-          GPSLatitude: location.coords.latitude,
-          GPSLongitude: location.coords.longitude,
-        },
-        notes: userComments,
-        deviceId: Device.deviceName,
-      },
+      body: formData,
       headers: {
         "Content-Type": "multipart/form-data",
       },
