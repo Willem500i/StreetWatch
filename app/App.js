@@ -16,6 +16,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as Location from "expo-location";
 import * as Device from "expo-device";
+import StreetWatch from "./assets/Streetwatch.png";
 
 const API_ENDPOINT = "http://192.168.148.133:5000";
 
@@ -24,6 +25,10 @@ const Tab = createBottomTabNavigator();
 function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
+      <Image
+        source={require("./assets/Streetwatch.png")}
+        style={styles.image}
+      />
       <Text style={styles.item}>StreetWatch</Text>
       <Text style={styles.paragraph}>
         Welcome to StreetWatch, helping keep traffic clear and the streets safe.
@@ -92,7 +97,6 @@ function CameraScreen() {
         location: {
           GPSLatitude: location.coords.latitude,
           GPSLongitude: location.coords.longitude,
-          //GPSAltitude: location.coords.altitude,
         },
         notes: userComments,
         deviceId: Device.deviceName,
@@ -225,9 +229,17 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  image: {
+    justifyContent: "center",
+    alignItems: "center",
+    margin: 24,
+    width: 120,
+    height: 120,
+  },
   container: {
     flex: 1,
     justifyContent: "center",
+    alignItems: "center",
     paddingTop: StatusBar.currentHeight,
     backgroundColor: "#ecf0f1",
     padding: 8,
