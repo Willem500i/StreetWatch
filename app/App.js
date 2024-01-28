@@ -99,6 +99,8 @@ function CameraScreen() {
       },
       "device",
       { Device },
+      "notes",
+      { userComments },
     );
     setLoading(true);
     await fetch(`${API_ENDPOINT}/api/form`, {
