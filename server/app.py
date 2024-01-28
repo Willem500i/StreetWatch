@@ -6,18 +6,18 @@ from json import loads
 import keras_ocr
 import flask
 import sqlite3
+from os import getcwd
+import uuid
 
 
 PARKING_CONFIDENCE_THRESHOLD = 20
 PLATE_CONFIDENCE_THRESHOLD = 20
 PARKING_OVERLAP = 30
 PLATE_OVERLAP = 30
-TAKE_AGAIN = 406
-
 
 ROBOFLOW_API_KEY = "PwlSn08nyNsZDHD0aSlg"
 
-DATABASE = "/data/database.db"
+DATABASE = getcwd() + "/data/database.db"
 
 
 # (1) https://blog.roboflow.com/license-plate-detection-and-ocr/
@@ -35,24 +35,62 @@ license_model = license_project.version(4).model
 
 
 app = flask.Flask(__name__)
+app.debug = True
 @app.route("/")
 def index():
-    return "Hello world"
+    return "index"
 
-@app.route("/api/form")
+@app.route("/all")
+def view_all():
+  cur = get_db().cursor()
+
+  rows = cur.execute("SELECT * FROM entry")
+  for row in rows:
+    print(row)
+
+  print("TESTESTEST")
+  return "Hi"
+
+@app.route("/report")
+def view_report():
+  pass
+
+@app.route("/clear")
+def clear_entries():
+  db = get_db()
+  cur = db.cursor()
+  cur.execute("DELETE FROM entry")
+  cur.close()
+  db.commit()
+  return "Cleared"
+
+@app.route("/api/form", methods=["GET", "POST"])
 def post_image():
-  img_file = flask.request.files.get('image', '')
 
-  park_obj = parking_model.predict(img_file, confidence=PARKING_CONFIDENCE_THRESHOLD, overlap=PARKING_OVERLAP).json()
-  plate_obj = license_model.predict(img_file,confidence=PLATE_CONFIDENCE_THRESHOLD,overlap=PLATE_OVERLAP).json()
+  if flask.request.method == "GET":
+    return flask.render_template("manual.html")
+  
+  new_file_name = str(uuid.uuid4())
+
+  img_file = flask.request.files['image']
+  img_file_str = img_file.read()
+  img_file_bytes = np.fromstring(img_file_str, np.uint8)
+  img_file_cv = cv2.imdecode(img_file_bytes, cv2.IMREAD_UNCHANGED)
+  if not img_file:
+    print("IMAGE NOT FOUND")
+    exit()
+  cv2.imwrite(fr"./photos/{new_file_name}.jpg", img_file_cv)
+  park_obj = parking_model.predict(fr"./photos/{new_file_name}.jpg", confidence=PARKING_CONFIDENCE_THRESHOLD, overlap=PARKING_OVERLAP).json()
+  plate_obj = license_model.predict(fr"./photos/{new_file_name}.jpg",confidence=PLATE_CONFIDENCE_THRESHOLD,overlap=PLATE_OVERLAP).json()
 
   park_confidence = float(park_obj["predictions"][0]["confidence"]) * 100
   plate_confidence = float(plate_obj["predictions"][0]["confidence"]) * 100
 
   if park_confidence < PARKING_CONFIDENCE_THRESHOLD and plate_confidence < PLATE_CONFIDENCE_THRESHOLD:
-      return TAKE_AGAIN
+      return flask.Response("Could not identify parking job or license plate.", status=406)
+  
 
-  frame = cv2.imread(img_file)
+  frame = cv2.imread(fr"./photos/{new_file_name}.jpg")
 
   x, y, width, height = plate_obj["predictions"][0]["x"], plate_obj["predictions"][0]["y"], plate_obj["predictions"][0]["width"], plate_obj["predictions"][0]["height"]
   crop_frame = frame[int(y-height / 2):int(y + height / 2), int(x - width / 2):int(x + width / 2)]
@@ -66,25 +104,30 @@ def post_image():
     for prediction in predictions:
       print(prediction[0])
 
+  db = get_db()
+  cur = db.cursor()
+  date = 0
+  lat = 0
+  lon = 0
+  device_id = 1
+  device_type = 1
+  device_OS = 1
 
-  cur = get_db().cursor()
 
+  entry_data = (date,lat,lon,device_id,device_type,device_OS,new_file_name)
 
+  cur.execute("INSERT INTO entry VALUES(?,?,?,?,?,?,?)", entry_data)
+  cur.close()
+  db.commit()
 
-  with open("reports/current.txt", "w") as f:
-    f.write("DATE: 1/27/2024\n")
-    f.write("Incident: Illegally Parked\n")
-    f.write("Location: some place, DC\n")
-    f.write("GEO: <lat, long>\n")
-    f.write("PLATE: "+ str(prediction_groups[0][0][0]))
-    f.write("\nContact us beep boop")
+  return flask.Response("Submission processed", status=200)
 
 # From Roboflow (Source 1)
 def preprocessImage(image):
   # Read Image (already read)
   #img = cv2.imread(image)
   # Resize Image
-  img = cv2.resize(img, None, fx=1.2, fy=1.2, interpolation=cv2.INTER_CUBIC)
+  img = cv2.resize(image, None, fx=1.2, fy=1.2, interpolation=cv2.INTER_CUBIC)
   # Change Color Format
   img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
   # Kernel to filter image
