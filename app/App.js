@@ -8,27 +8,37 @@ import {
   View,
   Image,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { Camera } from "expo-camera";
-import * as MediaLibrary from "expo-media-library";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { Audio } from "expo-av";
 import * as Location from "expo-location";
-import DeviceInfo from "react-native-device-info";
+import * as Device from "expo-device";
 
 const Tab = createBottomTabNavigator();
 
 function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.item}>Home Screen</Text>
+      <Text style={styles.item}>StreetWatch</Text>
+      <Text style={styles.paragraph}>
+        Welcome to StreetWatch, helping keep traffic clear and the streets safe.
+        In order to use the app properly, please allow location and camera
+        permissions when prompted.
+      </Text>
+      <Text style={styles.paragraph}>
+        Tap on "Submit Report" in the corner to submit a traffic violation.
+      </Text>
     </SafeAreaView>
   );
 }
 
 function CameraScreen() {
+  const [cameraPermission, setCameraPermission] = useState(false);
+  const [locationPermission, setLocationPermission] = useState(false);
+
   const [photo, setPhoto] = useState(null);
   const [location, setLocation] = useState(null);
   const [photoSent, setPhotoSent] = useState(false);
@@ -37,29 +47,20 @@ function CameraScreen() {
   const [pictureBeingTaken, setPictureBeingTaken] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const [uniqueId, setUniqueId] = useState(null);
-  const [deviceType, setDeviceType] = useState(null);
-  const [deviceOS, setDeviceOS] = useState(null);
+  const [userComments, setUserComments] = useState("");
 
   useEffect(() => {
     const requestPerms = async () => {
       const cameraPermission = await Camera.requestCameraPermissionsAsync();
-      const mediaLibraryPermission =
-        await MediaLibrary.requestPermissionsAsync();
-      const AudioPerm = await Audio.requestPermissionsAsync();
+      setCameraPermission(cameraPermission.status === "granted");
+
       const locationStatus = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(locationStatus.status === "granted");
 
       if (locationStatus.status === "granted") {
         const currentLocation = await Location.getCurrentPositionAsync({});
         setLocation(currentLocation);
       }
-      const uniqueId = await DeviceInfo.getUniqueId();
-      const type = await DeviceInfo.getType();
-      const os = await DeviceInfo.getOs();
-
-      setUniqueId(uniqueId);
-      setDeviceType(type);
-      setDeviceOS(os);
     };
 
     requestPerms();
@@ -101,7 +102,7 @@ function CameraScreen() {
         GPSAltitude: location.coords.altitude,
       },
       "device",
-      { uniqueId, deviceType, deviceOS },
+      { Device },
     );
     setLoading(true);
     await fetch("https://api.example.com/upload", {
@@ -126,12 +127,6 @@ function CameraScreen() {
     setLoading(false);
   };
 
-  const savePhoto = () => {
-    MediaLibrary.saveToLibraryAsync(photo.uri).then(() => {
-      setPhoto(null);
-    });
-  };
-
   if (photo) {
     return (
       <SafeAreaView style={styles.container}>
@@ -143,8 +138,22 @@ function CameraScreen() {
           <ActivityIndicator />
         ) : (
           <View>
+            <Text style="bold">
+              Submit image with the following information?
+            </Text>
+            <Text>
+              Location: {location.coords.latitude}, {location.coords.longitude}
+            </Text>
+            <Text>
+              Device: {Device.modelName}({Device.deviceName})
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="additional comments"
+              value={userComments}
+              onChangeText={setUserComments}
+            />
             <Button title="Upload Photo" onPress={uploadPhoto} />
-            <Button title="Save" onPress={savePhoto} />
             <Button title="Discard" onPress={() => setPhoto(null)} />
           </View>
         )}
@@ -197,26 +206,29 @@ export default function App() {
     <NavigationContainer>
       <Tab.Navigator
         screenOptions={({ route }) => ({
+          tabBarActiveTintColor: "tomato",
+          tabBarInactiveTintColor: "gray",
+          tabBarStyle: [
+            {
+              display: "flex",
+            },
+            null,
+          ],
           tabBarIcon: ({ focused, color, size }) => {
             let iconName;
 
             if (route.name === "Home") {
               iconName = focused ? "ios-home" : "ios-home-outline";
-            } else if (route.name === "Camera") {
+            } else if (route.name === "Submit Report") {
               iconName = focused ? "ios-camera" : "ios-camera-outline";
             }
 
-            // You can return any component that you like here
             return <Ionicons name={iconName} size={size} color={color} />;
           },
         })}
-        tabBarOptions={{
-          activeTintColor: "tomato",
-          inactiveTintColor: "gray",
-        }}
       >
         <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Camera" component={CameraScreen} />
+        <Tab.Screen name="Submit Report" component={CameraScreen} />
       </Tab.Navigator>
     </NavigationContainer>
   );
@@ -233,6 +245,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     backgroundColor: "white",
     alignSelf: "flex-end",
+    margin: 4,
   },
   item: {
     margin: 24,
@@ -240,8 +253,20 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
   },
+  paragraph: {
+    margin: 24,
+    fontSize: 16,
+    fontWeight: "normal",
+    textAlign: "center",
+  },
   preview: {
     alignSelf: "stretch",
     flex: 1,
+  },
+  input: {
+    height: 40,
+    margin: 12,
+    borderWidth: 1,
+    padding: 10,
   },
 });
