@@ -7,6 +7,7 @@ import keras_ocr
 import flask
 import sqlite3
 from os import getcwd
+import datetime
 import uuid
 
 
@@ -39,6 +40,13 @@ app.config["TEMPLATES_AUTO_RELOAD"]=True
 app.debug = True
 @app.route("/")
 def index():
+    
+    db = get_db()
+    cur = db.cursor()
+    cur.execute("DROP TABLE entry")
+    cur.execute("CREATE TABLE entry(date,lat,lon,device_id,notes,path)")
+    cur.close()
+    db.commit()
     return "index"
 
 @app.route("/all")
@@ -120,17 +128,21 @@ def post_image():
 
   db = get_db()
   cur = db.cursor()
-  date = 0
-  lat = 0
-  lon = 0
-  device_id = 1
-  device_type = 1
-  device_OS = 1
+
+  data = flask.request.get_json()
 
 
-  entry_data = (date,lat,lon,device_id,device_type,device_OS,new_file_name)
 
-  cur.execute("INSERT INTO entry VALUES(?,?,?,?,?,?,?)", entry_data)
+  date = datetime.datetime.now()
+  lat = data["location"]["GeoLatitude"]
+  lon = data["location"]["GeoLongitude"]
+  device_id = data["deviceId"]
+  notes = data["notes"]
+
+
+  entry_data = (date,lat,lon,device_id,notes,new_file_name)
+
+  cur.execute("INSERT INTO entry VALUES(?,?,?,?,?,?)", entry_data)
   cur.close()
   db.commit()
 

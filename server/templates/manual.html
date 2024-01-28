@@ -7,9 +7,11 @@
   </head>
   <body>
     <form method="POST" enctype="multipart/form-data">
-      <input type="file" name="image" id="image">
-      <input type="number">Latitude</input>
-      <input type="number">Longitude</input>
+      <input type="file" required name="image" id="image">
+      <input type="number" required name="lat">Latitude</input>
+      <input type="number" required name="lon">Longitude</input>
+      <input type="text" required name="notes">Notes</input>
+      <input type="text" required name="deviceId">DeviceID</input>
       <input type="submit">
     </form>
   </body>
