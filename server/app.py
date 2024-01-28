@@ -12,8 +12,8 @@ import uuid
 import base64
 import io
 
-PARKING_CONFIDENCE_THRESHOLD = 20
-PLATE_CONFIDENCE_THRESHOLD = 20
+PARKING_CONFIDENCE_THRESHOLD = 1
+PLATE_CONFIDENCE_THRESHOLD = 1
 PARKING_OVERLAP = 30
 PLATE_OVERLAP = 30
 
@@ -45,7 +45,7 @@ def index():
     db = get_db()
     cur = db.cursor()
     cur.execute("DROP TABLE entry")
-    cur.execute("CREATE TABLE entry(date,lat,lon,device_id,notes,path)")
+    cur.execute("CREATE TABLE entry(date,lat,lon,device_id,notes,path,confidence_park,confidence_plate,plate)")
     cur.close()
     db.commit()
     return "index"
@@ -68,15 +68,13 @@ def view_report():
     return flask.Response("Invalid or missing report ID", status="404")
   db = get_db()
   cur = db.cursor()
-  cur.execute("SELECT * from entry WHERE photo = (?)",(id,))
+  cur.execute("SELECT * from entry WHERE path = (?)",(id,))
   row = cur.fetchone()
-  lat, lon, date, device_id, device_os, device_type = [None for _ in range(6)]
+  lat, lon, date, device_id, notes, pac, plc, plate = [None for _ in range(8)]
   if row:
-    print(len(row))
-    print(row)
-    date, lat, lon, device_id, device_type, device_os = [x for x in row[:6]]
+    date, lat, lon, device_id, notes, pac, plc, plate = row[0],row[1],row[2],row[3],row[4],row[6],row[7],row[8]
 
-  return flask.render_template("viewreport.html", pagetitle="View Report", lat=lat,lon=lon,date=date,device_id=device_id,device_os=device_os,device_type=device_type,id=id)
+  return flask.render_template("viewreport.html", pagetitle="View Report", lat=lat,lon=lon,date=date,device_id=device_id,notes=notes,id=id, park=pac, platec=plc, plate=plate)
 
 @app.route("/clear")
 def clear_entries():
@@ -95,17 +93,19 @@ def post_image():
   
   new_file_name = str(uuid.uuid4())
 
-  img_file = Image.open(io.BytesIO(base64.b64decode(flask.request.form['image'])))
-  img_file_str = img_file.read()
+  img_file = None
+  img_file_str = io.BytesIO(base64.b64decode(flask.request.form['image'])).read()
   img_file_bytes = np.fromstring(img_file_str, np.uint8)
   img_file_cv = cv2.imdecode(img_file_bytes, cv2.IMREAD_UNCHANGED)
-  if not img_file:
-    print("IMAGE NOT FOUND")
-    exit()
+
+
   cv2.imwrite(fr"./static/images/{new_file_name}.jpg", img_file_cv)
   park_obj = parking_model.predict(fr"./static/images/{new_file_name}.jpg", confidence=PARKING_CONFIDENCE_THRESHOLD, overlap=PARKING_OVERLAP).json()
   plate_obj = license_model.predict(fr"./static/images/{new_file_name}.jpg",confidence=PLATE_CONFIDENCE_THRESHOLD,overlap=PLATE_OVERLAP).json()
 
+
+  if len(park_obj["predictions"]) == 0 or len(park_obj["predictions"]) == 0:
+    return flask.Response("Could not identify parking job or license plate.", status=406)
   park_confidence = float(park_obj["predictions"][0]["confidence"]) * 100
   plate_confidence = float(plate_obj["predictions"][0]["confidence"]) * 100
 
@@ -129,21 +129,18 @@ def post_image():
 
   db = get_db()
   cur = db.cursor()
-
-  data = flask.request.get_json()
-
-
-
   date = datetime.datetime.now()
-  lat = flask.request.form["location"]["GPSLatitude"]
-  lon = flask.request.form["location"]["GPSLongitude"]
+  lon = flask.request.form["lon"]
+  lat = flask.request.form["lat"]
   device_id = flask.request.form["deviceId"]
   notes = flask.request.form["notes"]
 
 
-  entry_data = (date,lat,lon,device_id,notes,new_file_name)
+  plate = prediction[0]
 
-  cur.execute("INSERT INTO entry VALUES(?,?,?,?,?,?)", entry_data)
+  entry_data = (date,lat,lon,device_id,notes,new_file_name, park_confidence, plate_confidence, plate)
+
+  cur.execute("INSERT INTO entry VALUES(?,?,?,?,?,?,?,?,?)", entry_data)
   cur.close()
   db.commit()
 

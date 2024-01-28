@@ -5,7 +5,9 @@
 Location: &lt; {{lat}}, {{lon}} &gt; <br>
 Timestamp: {{date}} <br>
 Device Identifier: {{device_id}} <br>
-Device Name: {{device_type}} <br>
-Device Operating System: {{device_os}} <br><br>
+Plate: {{plate}} <br>
+Illegal Parking Confidence: {{park}} <br>
+Plate Confidence: {{platec}} <br>
+Notes: {{notes}} <br>
 <img style="max-width: 600px;" src="{{url_for('static', filename='images/')}}{{id}}.jpg"></img> <br>
 {% endblock %}

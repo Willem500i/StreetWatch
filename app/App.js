@@ -82,7 +82,9 @@ function CameraScreen() {
         GPSAltitude: location.coords.altitude,
       }),
     };
+
     let newPhoto = await cameraRef.current.takePictureAsync(options);
+    console.log(typeof newPhoto);
     setPictureBeingTaken(false);
     setPhoto(newPhoto);
   };
@@ -90,11 +92,10 @@ function CameraScreen() {
   const uploadPhoto = async () => {
     setLoading(true);
     const formData = new FormData();
-    formData.append("image", photo, "photo.jpg");
-    formData.append("location", {
-      GPSLatitude: location.coords.latitude,
-      GPSLongitude: location.coords.longitude,
-    });
+
+    formData.append("image", photo.base64);
+    formData.append("lat", location.coords.latitude);
+    formData.append("lon", location.coords.longitude);
     formData.append("notes", userComments);
     formData.append("deviceId", Device.deviceName);
 
@@ -116,7 +117,13 @@ function CameraScreen() {
         console.log("Success:", response);
       })
       .catch((error) => {
-        console.error("Error:", error);
+        if (response.status === 406) {
+          setRetakePhoto(true);
+        }
+        // retake photo
+        else {
+          console.error("Error:", error);
+        }
       });
     setLoading(false);
   };
