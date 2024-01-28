@@ -140,6 +140,8 @@ def post_image():
 
   entry_data = (date,lat,lon,device_id,notes,new_file_name, park_confidence, plate_confidence, plate)
 
+  print(new_file_name)
+
   cur.execute("INSERT INTO entry VALUES(?,?,?,?,?,?,?,?,?)", entry_data)
   cur.close()
   db.commit()
