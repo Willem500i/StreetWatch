@@ -16,6 +16,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as Location from "expo-location";
 import * as Device from "expo-device";
+const API_ENDPOINT = "127.0.0.1:5000";
 
 const Tab = createBottomTabNavigator();
 
@@ -36,9 +37,6 @@ function HomeScreen() {
 }
 
 function CameraScreen() {
-  const [cameraPermission, setCameraPermission] = useState(false);
-  const [locationPermission, setLocationPermission] = useState(false);
-
   const [photo, setPhoto] = useState(null);
   const [location, setLocation] = useState(null);
   const [photoSent, setPhotoSent] = useState(false);
@@ -52,10 +50,8 @@ function CameraScreen() {
   useEffect(() => {
     const requestPerms = async () => {
       const cameraPermission = await Camera.requestCameraPermissionsAsync();
-      setCameraPermission(cameraPermission.status === "granted");
 
       const locationStatus = await Location.requestForegroundPermissionsAsync();
-      setLocationPermission(locationStatus.status === "granted");
 
       if (locationStatus.status === "granted") {
         const currentLocation = await Location.getCurrentPositionAsync({});
@@ -105,21 +101,22 @@ function CameraScreen() {
       { Device },
     );
     setLoading(true);
-    await fetch("https://api.example.com/upload", {
+    await fetch(`${API_ENDPOINT}/api/form`, {
       method: "POST",
       body: formData,
       headers: {
         "Content-Type": "multipart/form-data",
       },
     })
-      .then((data) => {
-        if (data.response === "Retake Photo") {
+      .then((response) => {
+        if (response.status === 406) {
+          // retake photo
           setRetakePhoto(true);
         } else {
           setPhotoSent(true);
           setPhoto(null);
         }
-        console.log("Success:", data);
+        console.log("Success:", response);
       })
       .catch((error) => {
         console.error("Error:", error);
