@@ -16,7 +16,8 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as Location from "expo-location";
 import * as Device from "expo-device";
-const API_ENDPOINT = "127.0.0.1:5000";
+
+const API_ENDPOINT = "http://192.168.148.133:5000";
 
 const Tab = createBottomTabNavigator();
 
@@ -83,29 +84,19 @@ function CameraScreen() {
   };
 
   const uploadPhoto = async () => {
-    const formData = new FormData();
-    formData.append(
-      "image",
-      {
-        uri: photo.uri,
-        type: "image/jpeg",
-        name: "image.jpg",
-      },
-      "location",
-      {
-        GPSLatitude: location.coords.latitude,
-        GPSLongitude: location.coords.longitude,
-        GPSAltitude: location.coords.altitude,
-      },
-      "device",
-      { Device },
-      "notes",
-      { userComments },
-    );
     setLoading(true);
     await fetch(`${API_ENDPOINT}/api/form`, {
       method: "POST",
-      body: formData,
+      body: {
+        image: photo.uri,
+        location: {
+          GPSLatitude: location.coords.latitude,
+          GPSLongitude: location.coords.longitude,
+          //GPSAltitude: location.coords.altitude,
+        },
+        notes: userComments,
+        deviceId: Device.deviceName,
+      },
       headers: {
         "Content-Type": "multipart/form-data",
       },
@@ -162,7 +153,7 @@ function CameraScreen() {
 
   return retakePhoto ? (
     <View>
-      The photo could not be read. Please retake the photo now. <br></br>
+      The photo could not be read. Please retake the photo now.
       <Button
         title="Retake Photo"
         onPress={() => {
@@ -175,7 +166,7 @@ function CameraScreen() {
   ) : photoSent ? (
     <View>
       <Text>
-        Photo has been successfully uploaded.<br></br>
+        Photo has been successfully uploaded.
         <Button
           title="Take Another"
           onPress={() => {
