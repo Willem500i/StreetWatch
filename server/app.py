@@ -94,7 +94,7 @@ def post_image():
   
   new_file_name = str(uuid.uuid4())
 
-  img_file = flask.request.files['image']
+  img_file = flask.request.form['image']
   img_file_str = img_file.read()
   img_file_bytes = np.fromstring(img_file_str, np.uint8)
   img_file_cv = cv2.imdecode(img_file_bytes, cv2.IMREAD_UNCHANGED)
