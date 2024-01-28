@@ -9,7 +9,8 @@ import sqlite3
 from os import getcwd
 import datetime
 import uuid
-
+import base64
+import io
 
 PARKING_CONFIDENCE_THRESHOLD = 20
 PLATE_CONFIDENCE_THRESHOLD = 20
@@ -94,7 +95,7 @@ def post_image():
   
   new_file_name = str(uuid.uuid4())
 
-  img_file = flask.request.form['image']
+  img_file = Image.open(io.BytesIO(base64.b64decode(flask.request.form['image'])))
   img_file_str = img_file.read()
   img_file_bytes = np.fromstring(img_file_str, np.uint8)
   img_file_cv = cv2.imdecode(img_file_bytes, cv2.IMREAD_UNCHANGED)
