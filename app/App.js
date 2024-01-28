@@ -16,7 +16,6 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as Location from "expo-location";
 import * as Device from "expo-device";
-import StreetWatch from "./assets/Streetwatch.png";
 
 const API_ENDPOINT = "http://192.168.148.133:5000";
 
@@ -234,8 +233,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     margin: 24,
-    width: 120,
-    height: 120,
+    width: 200,
+    height: 200,
   },
   container: {
     flex: 1,
