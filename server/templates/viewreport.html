@@ -1,0 +1,13 @@
+{% extends "template.html" %}
+
+{% block body %}
+
+<img src="{{url_for('static', filename='images/')}}{{id}}.jpg"></img>
+
+{{lat}}
+{{lon}}
+{{device_id}}
+{{device_type}}
+{{device_os}}
+{{date}}
+{% endblock %}

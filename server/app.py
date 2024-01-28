@@ -53,7 +53,20 @@ def view_all():
 
 @app.route("/report")
 def view_report():
-  pass
+  id = flask.request.args.get("id")
+  if not id:
+    return flask.Response("Invalid or missing report ID", status="404")
+  db = get_db()
+  cur = db.cursor()
+  cur.execute("SELECT * from entry WHERE photo = (?)",(id,))
+  row = cur.fetchone()
+  lat, lon, date, device_id, device_os, device_type = [None for _ in range(6)]
+  if row:
+    print(len(row))
+    print(row)
+    date, lat, lon, device_id, device_type, device_os = [x for x in row[:6]]
+
+  return flask.render_template("viewreport.html", pagetitle="View Report", lat=lat,lon=lon,date=date,device_id=device_id,device_os=device_os,device_type=device_type,id=id)
 
 @app.route("/clear")
 def clear_entries():
@@ -79,9 +92,9 @@ def post_image():
   if not img_file:
     print("IMAGE NOT FOUND")
     exit()
-  cv2.imwrite(fr"./photos/{new_file_name}.jpg", img_file_cv)
-  park_obj = parking_model.predict(fr"./photos/{new_file_name}.jpg", confidence=PARKING_CONFIDENCE_THRESHOLD, overlap=PARKING_OVERLAP).json()
-  plate_obj = license_model.predict(fr"./photos/{new_file_name}.jpg",confidence=PLATE_CONFIDENCE_THRESHOLD,overlap=PLATE_OVERLAP).json()
+  cv2.imwrite(fr"./static/images/{new_file_name}.jpg", img_file_cv)
+  park_obj = parking_model.predict(fr"./static/images/{new_file_name}.jpg", confidence=PARKING_CONFIDENCE_THRESHOLD, overlap=PARKING_OVERLAP).json()
+  plate_obj = license_model.predict(fr"./static/images/{new_file_name}.jpg",confidence=PLATE_CONFIDENCE_THRESHOLD,overlap=PLATE_OVERLAP).json()
 
   park_confidence = float(park_obj["predictions"][0]["confidence"]) * 100
   plate_confidence = float(plate_obj["predictions"][0]["confidence"]) * 100
@@ -90,7 +103,7 @@ def post_image():
       return flask.Response("Could not identify parking job or license plate.", status=406)
   
 
-  frame = cv2.imread(fr"./photos/{new_file_name}.jpg")
+  frame = cv2.imread(fr"./static/images/{new_file_name}.jpg")
 
   x, y, width, height = plate_obj["predictions"][0]["x"], plate_obj["predictions"][0]["y"], plate_obj["predictions"][0]["width"], plate_obj["predictions"][0]["height"]
   crop_frame = frame[int(y-height / 2):int(y + height / 2), int(x - width / 2):int(x + width / 2)]
