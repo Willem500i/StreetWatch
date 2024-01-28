@@ -93,17 +93,14 @@ def post_image():
     return flask.render_template("manual.html")
   
   new_file_name = str(uuid.uuid4())
-  print("here1")
+
   img_file = flask.request.files['image']
-  print("here6")
   img_file_str = img_file.read()
-  print("here5")
   img_file_bytes = np.fromstring(img_file_str, np.uint8)
   img_file_cv = cv2.imdecode(img_file_bytes, cv2.IMREAD_UNCHANGED)
   if not img_file:
     print("IMAGE NOT FOUND")
     exit()
-  print("here4")
   cv2.imwrite(fr"./static/images/{new_file_name}.jpg", img_file_cv)
   park_obj = parking_model.predict(fr"./static/images/{new_file_name}.jpg", confidence=PARKING_CONFIDENCE_THRESHOLD, overlap=PARKING_OVERLAP).json()
   plate_obj = license_model.predict(fr"./static/images/{new_file_name}.jpg",confidence=PLATE_CONFIDENCE_THRESHOLD,overlap=PLATE_OVERLAP).json()
@@ -113,7 +110,7 @@ def post_image():
 
   if park_confidence < PARKING_CONFIDENCE_THRESHOLD and plate_confidence < PLATE_CONFIDENCE_THRESHOLD:
       return flask.Response("Could not identify parking job or license plate.", status=406)
-  print("here2")
+  
 
   frame = cv2.imread(fr"./static/images/{new_file_name}.jpg")
 
@@ -134,13 +131,13 @@ def post_image():
 
   data = flask.request.get_json()
 
-  print("here3")
+
 
   date = datetime.datetime.now()
-  lat = data["location"]["GeoLatitude"]
-  lon = data["location"]["GeoLongitude"]
-  device_id = data["deviceId"]
-  notes = data["notes"]
+  lat = flask.request.form["location"]["GPSLatitude"]
+  lon = flask.request.form["location"]["GPSLongitude"]
+  device_id = flask.request.form["deviceId"]
+  notes = flask.request.form["notes"]
 
 
   entry_data = (date,lat,lon,device_id,notes,new_file_name)
