@@ -12,8 +12,8 @@ import uuid
 import base64
 import io
 
-PARKING_CONFIDENCE_THRESHOLD = 1
-PLATE_CONFIDENCE_THRESHOLD = 1
+PARKING_CONFIDENCE_THRESHOLD = 15
+PLATE_CONFIDENCE_THRESHOLD = 15
 PARKING_OVERLAP = 30
 PLATE_OVERLAP = 30
 
@@ -38,10 +38,10 @@ license_model = license_project.version(4).model
 
 app = flask.Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"]=True
-app.debug = True
+
+# Index page. Only used to clear and remake the database for debugging/presentation purposes.
 @app.route("/")
 def index():
-    
     db = get_db()
     cur = db.cursor()
     cur.execute("DROP TABLE entry")
@@ -50,17 +50,7 @@ def index():
     db.commit()
     return "index"
 
-@app.route("/all")
-def view_all():
-  cur = get_db().cursor()
-
-  rows = cur.execute("SELECT * FROM entry")
-  for row in rows:
-    print(row)
-
-  print("TESTESTEST")
-  return "Hi"
-
+# View the details of a report.
 @app.route("/report")
 def view_report():
   id = flask.request.args.get("id")
@@ -73,9 +63,9 @@ def view_report():
   lat, lon, date, device_id, notes, pac, plc, plate = [None for _ in range(8)]
   if row:
     date, lat, lon, device_id, notes, pac, plc, plate = row[0],row[1],row[2],row[3],row[4],row[6],row[7],row[8]
-
   return flask.render_template("viewreport.html", pagetitle="View Report", lat=lat,lon=lon,date=date,device_id=device_id,notes=notes,id=id, park=pac, platec=plc, plate=plate)
 
+# Clear all entries from db, but keep db.
 @app.route("/clear")
 def clear_entries():
   db = get_db()
@@ -85,48 +75,51 @@ def clear_entries():
   db.commit()
   return "Cleared"
 
+# Create a new submission
 @app.route("/api/form", methods=["GET", "POST"])
 def post_image():
 
+  # Deprecated method
   if flask.request.method == "GET":
     return flask.render_template("manual.html")
   
+  # Random file name
   new_file_name = str(uuid.uuid4())
-
-  img_file = None
   img_file_str = io.BytesIO(base64.b64decode(flask.request.form['image'])).read()
   img_file_bytes = np.fromstring(img_file_str, np.uint8)
   img_file_cv = cv2.imdecode(img_file_bytes, cv2.IMREAD_UNCHANGED)
 
-
   cv2.imwrite(fr"./static/images/{new_file_name}.jpg", img_file_cv)
+  # Make predictions
   park_obj = parking_model.predict(fr"./static/images/{new_file_name}.jpg", confidence=PARKING_CONFIDENCE_THRESHOLD, overlap=PARKING_OVERLAP).json()
   plate_obj = license_model.predict(fr"./static/images/{new_file_name}.jpg",confidence=PLATE_CONFIDENCE_THRESHOLD,overlap=PLATE_OVERLAP).json()
 
-
+  # If no predictions, disregard
   if len(park_obj["predictions"]) == 0 or len(park_obj["predictions"]) == 0:
     return flask.Response("Could not identify parking job or license plate.", status=406)
+  # Get confidence levels
   park_confidence = float(park_obj["predictions"][0]["confidence"]) * 100
   plate_confidence = float(plate_obj["predictions"][0]["confidence"]) * 100
 
+  # If plate and park are probably not present, disregard
   if park_confidence < PARKING_CONFIDENCE_THRESHOLD and plate_confidence < PLATE_CONFIDENCE_THRESHOLD:
       return flask.Response("Could not identify parking job or license plate.", status=406)
   
-
   frame = cv2.imread(fr"./static/images/{new_file_name}.jpg")
 
+  # Crop image to be around detected plate area
   x, y, width, height = plate_obj["predictions"][0]["x"], plate_obj["predictions"][0]["y"], plate_obj["predictions"][0]["width"], plate_obj["predictions"][0]["height"]
   crop_frame = frame[int(y-height / 2):int(y + height / 2), int(x - width / 2):int(x + width / 2)]
-  #cv2.imwrite("photos/plate.jpg", crop_frame)
   preprocessImage(crop_frame)
 
-  #images = [keras_ocr.tools.read("photos/plate.jpg")]
+  # Find plate text
   images = [keras_ocr.tools.read(crop_frame)]
   prediction_groups = pipeline.recognize(images)
   for predictions in prediction_groups:
     for prediction in predictions:
       print(prediction[0])
 
+  # Store submission info in db
   db = get_db()
   cur = db.cursor()
   date = datetime.datetime.now()
@@ -134,21 +127,16 @@ def post_image():
   lat = flask.request.form["lat"]
   device_id = flask.request.form["deviceId"]
   notes = flask.request.form["notes"]
-
-
   plate = prediction[0]
-
   entry_data = (date,lat,lon,device_id,notes,new_file_name, park_confidence, plate_confidence, plate)
-
   print(new_file_name)
-
   cur.execute("INSERT INTO entry VALUES(?,?,?,?,?,?,?,?,?)", entry_data)
   cur.close()
   db.commit()
 
   return flask.Response("Submission processed", status=200)
 
-# From Roboflow (Source 1)
+# From Roboflow, some basic image preprocessing
 def preprocessImage(image):
   # Read Image (already read)
   #img = cv2.imread(image)
@@ -166,23 +154,10 @@ def preprocessImage(image):
   img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
   return img
 
-# Database methods
-
+# Database method
 def get_db():
   db = getattr(flask.g, '_database', None)
   if db is None:
     db = flask.g._database = sqlite3.connect(DATABASE)
     db.row_factory = sqlite3.Row
   return db
-
-@app.teardown_appcontext
-def close_connection(exception):
-  db = getattr(flask.g, '_database', None)
-  if db is not None:
-    db.close()
-
-def query_db(query, args=(), one=False):
-  cur = get_db().execute(query, args)
-  rv = cur.fetchall()
-  cur.close()
-  return (rv[0] if rv else None) if one else rv
