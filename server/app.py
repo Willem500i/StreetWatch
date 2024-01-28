@@ -35,6 +35,7 @@ license_model = license_project.version(4).model
 
 
 app = flask.Flask(__name__)
+app.config["TEMPLATES_AUTO_RELOAD"]=True
 app.debug = True
 @app.route("/")
 def index():
